@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isIssuerOrAdmin() {
+      return isAuthenticated() && (request.auth.token.role == 'ADMIN' || request.auth.token.role == 'ISSUER');
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
+    // Private Project Analysis & Repositories
+    match /projects/{projectId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+    }
+
+    // Private Assessment Transcripts & Responses
+    match /assessments/{assessmentId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.candidateUid == request.auth.uid);
+    }
+
+    // Public Verified Soulbound Credentials
+    // Anyone can read public credential verification records; only authorized issuers can create or revoke
+    match /credentials/{credentialId} {
+      allow read: if true;
+      allow create, update: if isIssuerOrAdmin();
+    }
+
+    // Verification audit logs
+    match /verificationLogs/{logId} {
+      allow create: if true;
+      allow read: if isIssuerOrAdmin();
+    }
+  }
+}

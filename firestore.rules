@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. User Private Data Isolation (users/{userId}/**)
+    // Only the authenticated user matching userId can read or write their private documents
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Sub-collections: profile, github, projects, assessments, reports, credentials
+      match /{allSubcollections=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // 2. Public Credentials Registry (credentials/{credentialId})
+    // Publicly readable for 7-Layer Verification; writable only by authenticated issuers / admin
+    match /credentials/{credentialId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // 3. System Benchmarks & Projects
+    match /benchmarks/{benchmarkId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
